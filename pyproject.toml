@@ -1,0 +1,20 @@
+[project]
+name = "sina-hq-crawler"
+version = "0.2.0"
+description = "新浪财经实时行情数据采集系统（数据仓库分层架构）"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+crawl = "src.crawler:main"
+analyze = "src.analyze:main"
+maintain = "src.maintenance:main"

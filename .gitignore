@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+hq_data.db
+hq_data.db-wal
+hq_data.db-shm
+logs/
+archives/
+*.egg-info/
+dist/
+build/
+.coverage
+.pytest_cache/
+CLAUDE.local.md

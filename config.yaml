@@ -1,0 +1,56 @@
+# 新浪财经实时行情采集器配置
+
+symbols:
+  - sh000001
+  - bj920576
+
+crawl:
+  poll_interval: 3
+  test_duration: 0
+  batch_commit_size: 20
+  batch_commit_interval: 10
+
+http:
+  api_url: "https://hq.sinajs.cn/rn={ts}&list={symbols}"
+  timeout: 10
+  max_retries: 3
+  retry_base_delay: 1.0
+  retry_max_delay: 30.0
+  headers:
+    Referer: "https://finance.sina.com.cn/"
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+concurrency:
+  enabled: auto
+  max_workers: 4
+  auto_threshold: 6
+  batch_size: 4
+
+database:
+  path: "hq_data.db"
+  wal_mode: true
+  cache_size: -4000
+  busy_timeout: 5000
+
+logging:
+  level: INFO
+  file: "logs/crawler.log"
+  max_bytes: 10485760
+  backup_count: 5
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+monitor:
+  enabled: true
+  latency_warn_ms: 500
+  latency_critical_ms: 2000
+  gap_threshold_seconds: 15
+  price_spike_pct: 3.0
+  alert_to: console
+  alert_file: "logs/alerts.log"
+
+retention:
+  ods_days: 7
+  dwd_days: 90
+  dws_days: 365
+  compress_on_cleanup: true
+  archive_dir: "archives/"

@@ -1,0 +1,71 @@
+# ===== 新浪财经实时行情采集器配置 =====
+# 复制为 config.yaml 后修改
+
+# 采集标的列表
+# 前缀规则: sh=上交所, sz=深交所, bj=北交所
+symbols:
+  - sh000001    # 上证指数
+  - bj920576    # 天力复合
+  # - sz000001  # 平安银行
+  # - sh600519  # 贵州茅台
+
+# 采集参数
+crawl:
+  poll_interval: 3          # 轮询间隔（秒），最低建议 1
+  test_duration: 0          # 测试时长（秒），0=无限运行
+  batch_commit_size: 20     # 每 N 条 DWD 行提交一次事务
+  batch_commit_interval: 10 # 或每 M 秒提交一次（先到者触发）
+
+# HTTP 请求配置
+http:
+  api_url: "https://hq.sinajs.cn/rn={ts}&list={symbols}"
+  timeout: 10               # 单次请求超时（秒）
+  max_retries: 3            # 最大重试次数（0=不重试）
+  retry_base_delay: 1.0     # 重试基础延迟（秒），按 2^n 指数退避
+  retry_max_delay: 30.0     # 最大重试延迟（秒）
+  headers:
+    Referer: "https://finance.sina.com.cn/"   # 必需，否则被拒绝
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# 并发配置
+# auto 模式: 标的数 < auto_threshold 时单线程，>= 时自动启用多线程
+# true 模式: 始终多线程
+# false 模式: 始终单线程
+concurrency:
+  enabled: auto
+  max_workers: 4            # 最大线程数
+  auto_threshold: 6         # auto 模式阈值
+  batch_size: 4             # 每线程每轮处理的标的数
+
+# 数据库配置
+database:
+  path: "hq_data.db"        # SQLite 文件路径
+  wal_mode: true            # WAL 日志模式（推荐开启）
+  cache_size: -4000         # 缓存大小（负值=KB，-4000=4MB）
+  busy_timeout: 5000        # 锁等待超时（毫秒）
+
+# 日志配置
+logging:
+  level: INFO               # DEBUG / INFO / WARNING / ERROR
+  file: "logs/crawler.log"  # 日志文件路径
+  max_bytes: 10485760       # 单文件最大 10MB
+  backup_count: 5           # 保留 5 个轮转文件
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+# 监控告警配置
+monitor:
+  enabled: true
+  latency_warn_ms: 500      # 延迟告警阈值（毫秒）
+  latency_critical_ms: 2000 # 延迟严重告警阈值（毫秒）
+  gap_threshold_seconds: 15  # 断流检测阈值（秒）
+  price_spike_pct: 3.0      # 价格异常涨跌幅阈值（%）
+  alert_to: console         # 告警输出: console / file / both
+  alert_file: "logs/alerts.log"
+
+# 数据保留策略
+retention:
+  ods_days: 7               # ODS 原始数据保留天数
+  dwd_days: 90              # DWD 清洗数据保留天数
+  dws_days: 365             # DWS 聚合数据保留天数
+  compress_on_cleanup: true # 清理时对 ODS 做 gzip 归档
+  archive_dir: "archives/"  # 归档文件目录
