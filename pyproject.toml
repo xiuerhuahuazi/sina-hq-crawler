@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "sina-hq-crawler"
 version = "0.2.0"
@@ -18,3 +22,6 @@ dev = [
 crawl = "src.crawler:main"
 analyze = "src.analyze:main"
 maintain = "src.maintenance:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

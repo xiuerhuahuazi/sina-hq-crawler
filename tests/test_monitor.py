@@ -60,12 +60,12 @@ class TestQuoteMonitor:
         assert mon.get_stats()['total_alerts'] >= 1
         assert mon.get_stats()['alert_counts'].get('CRITICAL', 0) >= 1
 
-    def test_consecutive_failures_reset_on_tick(self, base_config):
+    def test_consecutive_failures_reset_on_fetch_success(self, base_config):
         mon = QuoteMonitor(base_config)
         mon.on_fetch_error(Exception("err1"))
         mon.on_fetch_error(Exception("err2"))
         assert mon.get_stats()['consecutive_failures'] == 2
-        mon.on_tick("sh000001", 4000.0, 3900.0, 50.0)
+        mon.on_fetch_success(["sh000001"])
         assert mon.get_stats()['consecutive_failures'] == 0
 
     def test_disabled_monitor_noop(self, base_config):
@@ -81,7 +81,7 @@ class TestQuoteMonitor:
     def test_check_gaps_alerts(self, base_config):
         base_config['monitor']['gap_threshold_seconds'] = 0.1
         mon = QuoteMonitor(base_config)
-        mon.on_tick("sh000001", 4000.0, 3900.0, 50.0)
+        mon.on_fetch_success(["sh000001"])
         time.sleep(0.2)
         mon.check_gaps(["sh000001"])
         stats = mon.get_stats()
@@ -89,7 +89,32 @@ class TestQuoteMonitor:
 
     def test_check_gaps_no_alert_when_fresh(self, base_config):
         mon = QuoteMonitor(base_config)
-        mon.on_tick("sh000001", 4000.0, 3900.0, 50.0)
+        mon.on_fetch_success(["sh000001"])
         mon.check_gaps(["sh000001"])
         stats = mon.get_stats()
         assert stats['total_alerts'] == 0
+
+    def test_dedup_no_false_gap(self, base_config):
+        """on_fetch_success prevents gap alerts even when on_tick is never called (dedup)."""
+        base_config['monitor']['gap_threshold_seconds'] = 0.1
+        mon = QuoteMonitor(base_config)
+        # Simulate: fetch succeeds but all ticks are deduped (on_tick never called)
+        mon.on_fetch_success(["sh000001"])
+        time.sleep(0.05)
+        mon.on_fetch_success(["sh000001"])  # another fetch, still no on_tick
+        time.sleep(0.05)
+        mon.check_gaps(["sh000001"])
+        stats = mon.get_stats()
+        # No gap alert because on_fetch_success was called recently
+        assert stats['alert_counts'].get('CRITICAL', 0) == 0
+
+    def test_on_fetch_success_updates_gap_timer(self, base_config):
+        base_config['monitor']['gap_threshold_seconds'] = 0.2
+        mon = QuoteMonitor(base_config)
+        mon.on_fetch_success(["sh000001", "bj920576"])
+        time.sleep(0.1)
+        mon.check_gaps(["sh000001", "bj920576"])
+        assert mon.get_stats()['total_alerts'] == 0
+        time.sleep(0.15)
+        mon.check_gaps(["sh000001", "bj920576"])
+        assert mon.get_stats()['alert_counts'].get('CRITICAL', 0) >= 1

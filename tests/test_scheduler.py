@@ -132,7 +132,7 @@ class TestMultiThreadedRun:
         base_config['crawl']['poll_interval'] = 0.05
         sched, storage, fetcher, parser, monitor = make_scheduler(base_config)
         # Provide real parsed quotes
-        parser.parse_response.return_value = [
+        parser.return_value = [
             {"symbol": "sh000001", "name": "上证指数", "current": 4000.0,
              "prev_close": 3900.0, "open": 3950.0, "high": 4010.0, "low": 3940.0,
              "volume": 100000, "amount": 500000000, "quote_date": "2026-06-05",
@@ -167,7 +167,7 @@ class TestFetchAndStoreBatch:
     def test_single_thread_with_parsed_quotes(self, base_config):
         sched, storage, fetcher, parser, monitor = make_scheduler(base_config)
         sched._round_count = 1
-        parser.parse_response.return_value = [
+        parser.return_value = [
             {"symbol": "sh000001", "name": "上证指数", "current": 4000.0,
              "prev_close": 3900.0, "open": 3950.0, "high": 4010.0, "low": 3940.0,
              "volume": 100000, "amount": 500000000, "quote_date": "2026-06-05",

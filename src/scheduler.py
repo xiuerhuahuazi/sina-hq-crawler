@@ -133,7 +133,7 @@ class CrawlScheduler:
         """Fetch a batch of symbols (runs in thread)."""
         try:
             raw_text, status_code, latency_ms = self._fetcher.fetch_with_retry(symbols)
-            quotes = self._parser.parse_response(raw_text)
+            quotes = self._parser(raw_text)
             return raw_text, quotes, status_code, latency_ms, ""
         except Exception as e:
             logger.error("Fetch batch failed: %s", e)
@@ -145,7 +145,7 @@ class CrawlScheduler:
         """Single-threaded fetch and store."""
         try:
             raw_text, status_code, latency_ms = self._fetcher.fetch_with_retry(symbols)
-            quotes = self._parser.parse_response(raw_text)
+            quotes = self._parser(raw_text)
             self._storage.store(raw_text, quotes, status_code, latency_ms)
             self._success_count += len(quotes)
 

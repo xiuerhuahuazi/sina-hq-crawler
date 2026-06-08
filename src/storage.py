@@ -31,6 +31,11 @@ class QuoteStorage:
         symbols_in = ",".join(q['symbol'] for q in quotes) if quotes else ""
         self._pending_ods.append((now, url, status_code, raw_text, latency_ms, parse_ok, None, symbols_in))
 
+        # Notify monitor of successful fetch (for gap detection)
+        # This must happen regardless of dedup — the API responded with data.
+        if self._monitor and quotes:
+            self._monitor.on_fetch_success([q['symbol'] for q in quotes])
+
         # DWD: dedup check then insert
         for q in quotes:
             if self._should_insert(q):

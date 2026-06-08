@@ -48,11 +48,13 @@ def analyze_symbol(conn, symbol: str, date: str = None) -> dict:
         WHERE symbol = ? {date_filter} ORDER BY fetched_at DESC LIMIT 1
     """, params).fetchone()
 
-    # Dedup stats (from ODS)
-    ods_count = conn.execute("""
-        SELECT COUNT(*) FROM ods_raw_quotes
-        WHERE symbols_in LIKE ?
-    """, (f'%{symbol}%',)).fetchone()[0]
+    # Dedup stats: count how many ODS rounds contain this symbol
+    # Each ODS record may contain multiple symbols, so we count records
+    # where this symbol appears, but normalize by the average symbols per request
+    ods_total = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
+    # Approximate: assume each ODS request covers the same number of symbols
+    # For per-symbol ratio, use DWD tick count vs expected (ods_total) directly
+    ods_count = ods_total  # each round fetches all symbols together
 
     # Latency percentiles (approximate via ordered selection)
     latencies = conn.execute(f"""
@@ -115,6 +117,10 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
     dwd_count = conn.execute("SELECT COUNT(*) FROM dwd_quotes").fetchone()[0]
     ods_count = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
 
+    # Overall dedup: compare DWD count against expected (ODS rounds × symbols)
+    expected_ticks = ods_count * len(symbols)
+    overall_dedup = (1 - dwd_count / expected_ticks) * 100 if expected_ticks > 0 else 0
+
     report = f"""# 新浪行情采集系统 — 数据分析报告
 
 > 生成时间: {now}
@@ -125,9 +131,10 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
 
 | 指标 | 值 |
 |------|-----|
-| ODS 原始记录 | {ods_count} |
+| ODS 采集轮次 | {ods_count} |
 | DWD 清洗记录 | {dwd_count} |
-| 整体去重率 | {(1 - dwd_count / ods_count) * 100 if ods_count > 0 else 0:.1f}% |
+| 预期总 tick 数 | {expected_ticks} |
+| 整体去重率 | {overall_dedup:.1f}% |
 | 分析标的数 | {len(symbols)} |
 
 """
@@ -188,12 +195,14 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
     health_items = []
 
     # Check dedup effectiveness
-    if dwd_count > 0 and ods_count > 0:
-        dedup_rate = (1 - dwd_count / ods_count) * 100
-        if dedup_rate > 50:
+    if dwd_count > 0 and expected_ticks > 0:
+        dedup_rate = overall_dedup
+        if dedup_rate > 30:
             health_items.append(f"- **去重有效**: DWD 去重率 {dedup_rate:.1f}%，存储优化显著")
+        elif dedup_rate > 0:
+            health_items.append(f"- **去重正常**: DWD 去重率 {dedup_rate:.1f}%")
         else:
-            health_items.append(f"- **去重率低**: DWD 去重率仅 {dedup_rate:.1f}%，标的可能交易活跃")
+            health_items.append(f"- **数据活跃**: 去重率 {dedup_rate:.1f}%，标的交易频繁")
 
     # Check latency
     all_stats = [analyze_symbol(conn, s, date) for s in symbols]

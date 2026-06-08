@@ -22,8 +22,9 @@ class QuoteMonitor:
 
         self._alert_to: str = mon.get("alert_to", "console")  # 'console' / 'file' / 'both'
 
-        # Per-symbol monotonic timestamp of the last received tick.
-        self._last_tick_time: dict[str, float] = {}
+        # Per-symbol monotonic timestamp of the last successful fetch
+        # (updated on every API response, regardless of dedup).
+        self._last_fetch_time: dict[str, float] = {}
 
         # Consecutive fetch-error counter.
         self._consecutive_failures: int = 0
@@ -89,7 +90,23 @@ class QuoteMonitor:
                 )
 
         # --- bookkeeping ---
-        self._last_tick_time[symbol] = time.monotonic()
+        # Note: _last_fetch_time is updated by on_fetch_success(), not here.
+        # on_tick is only called for deduped ticks, so it's not suitable
+        # for gap detection.
+
+    def on_fetch_success(self, symbols: list[str]) -> None:
+        """Record a successful fetch for all symbols in the response.
+
+        Called on every successful API response, regardless of whether
+        the data was deduplicated.  This is the correct signal for
+        gap detection — not ``on_tick`` which only fires when the
+        price/volume actually changed.
+        """
+        if not self._enabled:
+            return
+        now = time.monotonic()
+        for sym in symbols:
+            self._last_fetch_time[sym] = now
         self._consecutive_failures = 0
 
     def on_fetch_error(self, error: Exception) -> None:
@@ -102,18 +119,24 @@ class QuoteMonitor:
             )
 
     def check_gaps(self, symbols: list[str]) -> None:
-        """Alert if any symbol has gone silent beyond the gap threshold."""
+        """Alert if any symbol has gone silent beyond the gap threshold.
+
+        Uses ``_last_fetch_time`` (updated on every successful API
+        response) rather than ``_last_tick_time`` (only updated when
+        a tick passes dedup).  This prevents false positives when the
+        price hasn't changed between polls.
+        """
         if not self._enabled:
             return
 
         now = time.monotonic()
         for sym in symbols:
-            last = self._last_tick_time.get(sym)
+            last = self._last_fetch_time.get(sym)
             if last is not None and (now - last) > self._gap_threshold_seconds:
                 self._alert(
                     "CRITICAL",
                     f"[{sym}] Data gap detected: "
-                    f"{now - last:.1f}s since last tick "
+                    f"{now - last:.1f}s since last fetch "
                     f"(threshold {self._gap_threshold_seconds:.0f}s)",
                 )
 
