@@ -2,7 +2,7 @@
 
 symbols:
   - sh000001
-  - bj920576
+  # - bj920576
 
 crawl:
   poll_interval: 3
@@ -54,3 +54,28 @@ retention:
   dws_days: 365
   compress_on_cleanup: true
   archive_dir: "archives/"
+
+sessions:
+  default:
+    - start: "09:30"
+      end: "11:30"
+    - start: "13:30"
+      end: "15:00"
+
+daemon:
+  pid_file: "logs/crawler.pid"
+  health:
+    enabled: true
+    host: "127.0.0.1"
+    port: 8089
+  hot_reload:
+    enabled: true
+    watch_file: "config.yaml"
+  post_market_report:
+    enabled: true
+    output_dir: "reports/"
+    auto_cleanup: true
+  auto_restart:
+    enabled: true
+    max_retries: 5
+    retry_delay: 10

@@ -61,6 +61,20 @@ def base_config():
             "compress_on_cleanup": True,
             "archive_dir": "archives/",
         },
+        "sessions": {
+            "default": [
+                {"start": "09:30", "end": "11:30"},
+                {"start": "13:00", "end": "15:00"},
+            ],
+            "overrides": {},
+        },
+        "daemon": {
+            "pid_file": "logs/crawler.pid",
+            "health": {"enabled": False, "host": "127.0.0.1", "port": 8089},
+            "hot_reload": {"enabled": False, "watch_file": "config.yaml"},
+            "post_market_report": {"enabled": False, "output_dir": "reports/", "auto_cleanup": False},
+            "auto_restart": {"enabled": True, "max_retries": 3, "retry_delay": 1},
+        },
     })
 
 

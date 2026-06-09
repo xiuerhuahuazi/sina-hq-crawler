@@ -16,12 +16,14 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "ruff>=0.4",
 ]
 
 [project.scripts]
 crawl = "src.crawler:main"
 analyze = "src.analyze:main"
 maintain = "src.maintenance:main"
+daemon = "src.daemon:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

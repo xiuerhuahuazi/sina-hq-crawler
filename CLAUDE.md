@@ -9,6 +9,11 @@ uv sync                          # 安装依赖
 uv run crawl --dry-run            # 验证配置
 uv run crawl                      # 启动采集
 uv run crawl --symbols sh000001   # 指定标的
+uv run daemon start               # 启动守护进程（前台）
+uv run daemon start --detach      # 启动守护进程（后台）
+uv run daemon stop                # 停止守护进程
+uv run daemon status              # 查看运行状态
+uv run daemon reload              # 热加载配置
 uv run analyze                    # 生成分析报告
 uv run maintain --dry-run         # 预览清理
 uv run maintain                   # 执行清理 + 归档
@@ -24,7 +29,17 @@ pytest                            # 运行测试
 - 线程池只做 HTTP，结果入 Queue，主线程串行写 DB
 - 配置: config.yaml（参考 config.example.yaml）
 - 测试: pytest（tests/ 目录）
-- 12 个源模块: config/db/fetcher/parser/storage/scheduler/logger/monitor/maintenance/crawler/analyze
+- 17 个源模块: config/db/fetcher/parser/storage/scheduler/logger/monitor/maintenance/crawler/analyze/daemon/session/health/reloader/reporter
+
+## 守护进程
+
+`uv run daemon` 管理采集生命周期：
+- 按 `sessions` 配置的时间窗口自动开关采集
+- 支持全局默认时段 + 个别 symbol 覆盖
+- 配置热加载（SIGHUP 或 mtime 变化）
+- 自动重启自愈（当日最大重试次数可配置）
+- 本地 HTTP 健康检查（127.0.0.1:8089/healthz）
+- 盘后自动报告 + 数据清理
 
 ## 架构详情
 

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/xiuerhuahuazi/projects/tmp/sina-hq-crawler && if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.py$'; then uv run ruff check --fix --quiet \"$CLAUDE_FILE_PATH\" 2>/dev/null; fi",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/xiuerhuahuazi/projects/tmp/sina-hq-crawler && FILE=$(basename \"$CLAUDE_FILE_PATH\" .py) && TEST_FILE=\"tests/test_${FILE}.py\" && if [ -f \"$TEST_FILE\" ]; then uv run pytest \"$TEST_FILE\" -q --tb=short --no-header 2>&1 | tail -8; fi",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}

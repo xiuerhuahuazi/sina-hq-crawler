@@ -62,6 +62,78 @@ class TestValidate:
             "http": {"api_url": "https://hq.sinajs.cn/rn={ts}&list={symbols}"},
         })
 
+    # --- sessions validation ---
+
+    def test_invalid_session_time_format_raises(self):
+        with pytest.raises(ValueError, match="HH:MM"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "sessions": {"default": [{"start": "9:30", "end": "11:30"}], "overrides": {}},
+            })
+
+    def test_invalid_hour_raises(self):
+        with pytest.raises(ValueError, match="invalid time"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "sessions": {"default": [{"start": "25:00", "end": "11:30"}], "overrides": {}},
+            })
+
+    def test_invalid_minute_raises(self):
+        with pytest.raises(ValueError, match="invalid time"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "sessions": {"default": [{"start": "09:60", "end": "11:30"}], "overrides": {}},
+            })
+
+    def test_override_invalid_format_raises(self):
+        with pytest.raises(ValueError, match="HH:MM"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "sessions": {
+                    "default": [{"start": "09:30", "end": "11:30"}],
+                    "overrides": {"sh000001": [{"start": "bad", "end": "11:30"}]},
+                },
+            })
+
+    def test_valid_sessions_passes(self):
+        _validate({
+            "symbols": ["sh000001"],
+            "crawl": {"poll_interval": 3},
+            "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+            "sessions": {
+                "default": [{"start": "09:30", "end": "11:30"}],
+                "overrides": {"sh000001": [{"start": "09:15", "end": "15:15"}]},
+            },
+        })
+
+    # --- daemon validation ---
+
+    def test_invalid_port_raises(self):
+        with pytest.raises(ValueError, match="port"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "daemon": {"health": {"port": 80}},
+            })
+
+    def test_invalid_max_retries_raises(self):
+        with pytest.raises(ValueError, match="max_retries"):
+            _validate({
+                "symbols": ["sh000001"],
+                "crawl": {"poll_interval": 3},
+                "http": {"api_url": "https://x?ts={ts}&s={symbols}"},
+                "daemon": {"auto_restart": {"max_retries": -1}},
+            })
+
 
 class TestLoadConfig:
     def test_explicit_valid_path(self, tmp_path):

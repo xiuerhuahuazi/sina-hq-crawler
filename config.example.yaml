@@ -69,3 +69,36 @@ retention:
   dws_days: 365             # DWS 聚合数据保留天数
   compress_on_cleanup: true # 清理时对 ODS 做 gzip 归档
   archive_dir: "archives/"  # 归档文件目录
+
+# ===== 交易时间段（守护进程模式） =====
+# 混合模式：全局默认时段 + 个别 symbol 级覆盖
+sessions:
+  default:                  # 所有标的的默认交易时段
+    - start: "09:30"
+      end: "11:30"
+    - start: "13:00"
+      end: "15:00"
+  # 个别标的可覆盖默认时段（可选）
+  # overrides:
+  #   sh000001:             # 上证指数：盘前盘后各多 15 分钟
+  #     - start: "09:15"
+  #       end: "15:15"
+
+# ===== 守护进程配置 =====
+daemon:
+  pid_file: "logs/crawler.pid"  # PID 文件路径
+  health:
+    enabled: true               # 启用 HTTP 健康检查
+    host: "127.0.0.1"           # 仅本地监听
+    port: 8089                  # 端口（被占用时自动回退文件模式）
+  hot_reload:
+    enabled: true               # 启用配置热加载
+    watch_file: "config.yaml"   # 监听的配置文件
+  post_market_report:
+    enabled: true               # 盘后自动生成报告
+    output_dir: "reports/"      # 报告输出目录
+    auto_cleanup: true          # 报告后自动执行数据清理
+  auto_restart:
+    enabled: true               # 采集异常时自动重启
+    max_retries: 5              # 单日最大重启次数
+    retry_delay: 10             # 重启间隔（秒）

@@ -7,6 +7,7 @@ hq_data.db-wal
 hq_data.db-shm
 logs/
 archives/
+reports/
 *.egg-info/
 dist/
 build/

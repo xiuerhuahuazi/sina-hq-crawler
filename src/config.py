@@ -2,6 +2,7 @@
 
 import logging
 import pathlib
+import re
 import yaml
 
 log = logging.getLogger(__name__)
@@ -69,6 +70,20 @@ _DEFAULTS: dict = {
         "compress_on_cleanup": True,
         "archive_dir": "archives/",
     },
+    "sessions": {
+        "default": [
+            {"start": "09:30", "end": "11:30"},
+            {"start": "13:00", "end": "15:00"},
+        ],
+        "overrides": {},
+    },
+    "daemon": {
+        "pid_file": "logs/crawler.pid",
+        "health": {"enabled": True, "host": "127.0.0.1", "port": 8089},
+        "hot_reload": {"enabled": True, "watch_file": "config.yaml"},
+        "post_market_report": {"enabled": True, "output_dir": "reports/", "auto_cleanup": True},
+        "auto_restart": {"enabled": True, "max_retries": 5, "retry_delay": 10},
+    },
 }
 
 
@@ -81,6 +96,24 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             merged[key] = value
     return merged
+
+
+_HH_MM_RE = re.compile(r"^\d{2}:\d{2}$")
+
+
+def _validate_time_window(window: dict, path: str) -> None:
+    """Validate a single time window has start/end in HH:MM format."""
+    for field in ("start", "end"):
+        val = window.get(field)
+        if not val or not _HH_MM_RE.match(str(val)):
+            raise ValueError(
+                f"{path}.{field} must be in HH:MM format, got: {val!r}"
+            )
+        hh, mm = int(val[:2]), int(val[3:])
+        if hh > 23 or mm > 59:
+            raise ValueError(
+                f"{path}.{field} has invalid time value: {val!r}"
+            )
 
 
 def _validate(cfg: dict) -> None:
@@ -102,6 +135,37 @@ def _validate(cfg: dict) -> None:
         raise ValueError(
             "config 'http.api_url' must contain both {ts} and {symbols} placeholders, "
             f"got: {api_url!r}"
+        )
+
+    # Validate sessions
+    sessions = cfg.get("sessions", {})
+    default_windows = sessions.get("default", [])
+    if not isinstance(default_windows, list):
+        raise ValueError("config 'sessions.default' must be a list")
+    for i, w in enumerate(default_windows):
+        _validate_time_window(w, f"sessions.default[{i}]")
+
+    overrides = sessions.get("overrides", {})
+    if not isinstance(overrides, dict):
+        raise ValueError("config 'sessions.overrides' must be a dict")
+    for sym, windows in overrides.items():
+        if not isinstance(windows, list):
+            raise ValueError(f"config 'sessions.overrides.{sym}' must be a list")
+        for i, w in enumerate(windows):
+            _validate_time_window(w, f"sessions.overrides.{sym}[{i}]")
+
+    # Validate daemon.health.port
+    port = cfg.get("daemon", {}).get("health", {}).get("port", 8089)
+    if not (1024 <= port <= 65535):
+        raise ValueError(
+            f"config 'daemon.health.port' must be 1024-65535, got {port}"
+        )
+
+    # Validate daemon.auto_restart.max_retries
+    max_retries = cfg.get("daemon", {}).get("auto_restart", {}).get("max_retries", 5)
+    if max_retries < 0:
+        raise ValueError(
+            f"config 'daemon.auto_restart.max_retries' must be >= 0, got {max_retries}"
         )
 
 

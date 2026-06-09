@@ -2,13 +2,15 @@ import time
 import signal
 import logging
 import math
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 
 logger = logging.getLogger(__name__)
 
 class CrawlScheduler:
-    def __init__(self, config: dict, storage, fetcher, parser, monitor=None):
+    def __init__(self, config: dict, storage, fetcher, parser, monitor=None,
+                 register_signals=True):
         self._config = config
         self._storage = storage
         self._fetcher = fetcher
@@ -33,9 +35,10 @@ class CrawlScheduler:
         self._fail_count = 0
         self._start_time = None
 
-        # Signal handlers
-        signal.signal(signal.SIGINT, self._handle_signal)
-        signal.signal(signal.SIGTERM, self._handle_signal)
+        # Signal handlers (skip when managed by daemon)
+        if register_signals:
+            signal.signal(signal.SIGINT, self._handle_signal)
+            signal.signal(signal.SIGTERM, self._handle_signal)
 
     def _handle_signal(self, signum, frame):
         if self._shutdown:
@@ -44,6 +47,14 @@ class CrawlScheduler:
         else:
             logger.info("Graceful shutdown initiated (signal %d)", signum)
             self._shutdown = True
+
+    def stop(self):
+        """外部可控停止（daemon 在时段结束时调用）。"""
+        self._shutdown = True
+
+    @property
+    def is_running(self) -> bool:
+        return self._start_time is not None and not self._shutdown
 
     def _decide_concurrency(self) -> tuple[int, list[list[str]]]:
         """Decide thread count and symbol batches."""
@@ -66,15 +77,28 @@ class CrawlScheduler:
 
         return workers, batches
 
-    def run(self):
-        """Main polling loop."""
+    def run(self, symbols=None, end_time=None):
+        """Main polling loop.
+
+        Parameters
+        ----------
+        symbols : list[str] | None
+            Override self._symbols (daemon passes current session symbols).
+        end_time : datetime | None
+            When set, scheduler exits when datetime.now() >= end_time.
+        """
+        if symbols is not None:
+            self._symbols = list(symbols)
+
         self._start_time = time.time()
         workers, batches = self._decide_concurrency()
 
         logger.info("Starting crawler: %d symbols, %d thread(s), %d batch(es), interval %ds",
                      len(self._symbols), workers, len(batches), self._poll_interval)
 
-        if self._test_duration > 0:
+        if end_time:
+            logger.info("End time: %s", end_time.strftime("%H:%M:%S"))
+        elif self._test_duration > 0:
             logger.info("Test duration: %ds", self._test_duration)
         else:
             logger.info("Running until interrupted")
@@ -82,6 +106,11 @@ class CrawlScheduler:
         try:
             while not self._force_exit:
                 if self._shutdown:
+                    break
+
+                # Check end_time (daemon session boundary)
+                if end_time and datetime.now() >= end_time:
+                    logger.info("End time reached (%s)", end_time.strftime("%H:%M:%S"))
                     break
 
                 if self._test_duration > 0:

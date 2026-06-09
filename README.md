@@ -26,6 +26,50 @@ uv run maintain --dry-run    # 预览清理
 uv run maintain              # 执行清理 + 归档
 ```
 
+## 守护进程
+
+守护进程按交易时段自动调度采集，无需手动启动/停止。
+
+```bash
+uv run daemon start              # 前台运行（自动按时段采集/休眠）
+uv run daemon start --detach     # 后台运行
+uv run daemon stop               # 停止守护进程
+uv run daemon status             # 查看运行状态
+uv run daemon reload             # 热加载配置（SIGHUP）
+```
+
+### 时间窗口调度
+
+在 `config.yaml` 的 `sessions` 中配置交易时段：
+
+```yaml
+sessions:
+  default:                        # 全局默认时段
+    - start: "09:30"
+      end: "11:30"
+    - start: "13:00"
+      end: "15:00"
+  overrides:                      # 个别 symbol 可覆盖
+    sh000001:
+      - start: "09:15"
+        end: "15:15"
+```
+
+- 全局 `default` 时段应用于所有未 override 的标的
+- `overrides` 中的标的使用独立时段
+- 窗口外自动休眠，窗口内自动启动采集
+- 支持跨日窗口（如 23:00-01:00）
+
+### 守护进程能力
+
+| 能力 | 说明 |
+|------|------|
+| 时间窗口调度 | 按配置时段自动开关采集，窗口外休眠等待 |
+| 配置热加载 | 修改 config.yaml 后 `uv run daemon reload` 或自动检测 mtime 变化，下一窗口生效 |
+| 自动重启自愈 | 采集异常自动重启，单日不超过 `max_retries` 次 |
+| 盘后自动报告 | 每个交易窗口结束后自动生成分析报告 |
+| 健康检查 HTTP | `127.0.0.1:8089/healthz` 返回 JSON 状态，端口被占用时回退文件模式 |
+
 ## 架构
 
 ### 数据仓库四层
@@ -50,8 +94,13 @@ uv run maintain              # 执行清理 + 归档
 | `src/logger.py` | 日志系统（RotatingFileHandler 轮转） |
 | `src/monitor.py` | 监控告警（延迟/断流/价格异常/连续失败） |
 | `src/maintenance.py` | 数据维护（过期清理 + ODS gzip 归档 + VACUUM） |
-| `src/crawler.py` | CLI 入口（`--config`、`--symbols`、`--duration`、`--dry-run`） |
+| `src/crawler.py` | 采集 CLI 入口（`--config`、`--symbols`、`--duration`、`--dry-run`） |
 | `src/analyze.py` | 分析报告（SQL 聚合、动态生成 Markdown） |
+| `src/daemon.py` | 守护进程主入口（PID 管理、信号处理、主循环、CLI） |
+| `src/session.py` | 时间窗口引擎（时段判断、symbol 合并、休眠调度） |
+| `src/health.py` | HTTP 健康检查（127.0.0.1 本地监听） |
+| `src/reloader.py` | 配置热加载（mtime 检测 + SIGHUP 触发） |
+| `src/reporter.py` | 盘后自动报告（调用 analyze + 可选 maintain） |
 
 ### 并发自动扩缩
 
