@@ -84,6 +84,12 @@ _DEFAULTS: dict = {
         "post_market_report": {"enabled": True, "output_dir": "reports/", "auto_cleanup": True},
         "auto_restart": {"enabled": True, "max_retries": 5, "retry_delay": 10},
     },
+    "market_data": {
+        "enabled": False,
+        "nodes": ["hs_a"],
+        "concept_nodes": [],
+        "refresh_interval": 300,
+    },
 }
 
 

@@ -203,6 +203,92 @@ def init_db(db_path: str, config: dict) -> sqlite3.Connection:
         ORDER BY symbol, trade_date
     """)
 
+    # -- DIM 层：节点数据（getHQNodeData API） --------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dwd_node_data (
+            symbol          TEXT NOT NULL PRIMARY KEY,
+            code            TEXT,
+            name            TEXT,
+            trade           REAL,
+            pricechange     REAL,
+            changepercent   REAL,
+            buy             REAL,
+            sell            REAL,
+            settlement      REAL,
+            open            REAL,
+            high            REAL,
+            low             REAL,
+            volume          REAL,
+            amount          REAL,
+            ticktime        TEXT,
+            per             REAL,
+            pb              REAL,
+            mktcap          REAL,
+            nmc             REAL,
+            turnoverratio   REAL,
+            fetched_at      TEXT NOT NULL
+        ) WITHOUT ROWID
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_node_data_fetched
+        ON dwd_node_data (fetched_at)
+    """)
+
+    # -- DIM 层：行业分类 ----------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dim_industries (
+            code          TEXT NOT NULL PRIMARY KEY,
+            name          TEXT NOT NULL,
+            level         INTEGER DEFAULT 1,
+            parent_code   TEXT,
+            updated_at    TEXT NOT NULL
+        ) WITHOUT ROWID
+    """)
+
+    # -- DIM 层：概念板块 ----------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dim_concepts (
+            code          TEXT NOT NULL PRIMARY KEY,
+            name          TEXT NOT NULL,
+            updated_at    TEXT NOT NULL
+        ) WITHOUT ROWID
+    """)
+
+    # -- DIM 层：标的分类映射 ------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dim_symbol_classifications (
+            symbol              TEXT NOT NULL,
+            classification_type TEXT NOT NULL,
+            classification_code TEXT NOT NULL,
+            updated_at          TEXT NOT NULL,
+            PRIMARY KEY (symbol, classification_type, classification_code)
+        ) WITHOUT ROWID
+    """)
+
+    # -- ADS：标的基本面视图 --------------------------------------------------
+    conn.execute("""
+        CREATE VIEW IF NOT EXISTS ads_symbol_fundamentals AS
+        SELECT
+            n.symbol,
+            n.name,
+            n.trade,
+            n.changepercent,
+            n.per,
+            n.pb,
+            n.mktcap,
+            n.nmc           AS circ_mktcap,
+            n.turnoverratio,
+            n.volume,
+            n.amount,
+            n.fetched_at,
+            sc.classification_code AS sw_industry
+        FROM dwd_node_data n
+        LEFT JOIN dim_symbol_classifications sc
+            ON n.symbol = sc.symbol
+            AND sc.classification_type = 'sw_industry'
+    """)
+
     conn.commit()
     log.info("Database initialized at %s (wal_mode=%s)", db_path, wal_mode)
     return conn

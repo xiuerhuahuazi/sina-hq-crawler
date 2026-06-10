@@ -102,6 +102,9 @@ sessions:
 | `src/reloader.py` | 配置热加载（mtime 检测 + SIGHUP 触发） |
 | `src/reporter.py` | 盘后自动报告（调用 analyze + 可选 maintain） |
 | `src/indicators.py` | 技术指标计算（盘中实时 + 离线历史，14 种指标） |
+| `src/node_fetcher.py` | 节点数据抓取（Market_Center.getHQNodeData API） |
+| `src/node_parser.py` | 节点数据解析（per/pb/mktcap/nmc/turnoverratio） |
+| `src/market_data.py` | 市场数据加载器（节点行情 + 行业/概念分类） |
 
 ### 并发自动扩缩
 
@@ -185,6 +188,46 @@ latest = compute_latest(conn, "sh000001")
 # {'vwap': 3200.5, 'rsi14': 65.3, 'macd_dif': 12.5, ...}
 ```
 
+## 市场数据
+
+`src/market_data.py` 通过行情中心列表数据 API 获取更丰富的字段（per/pb/mktcap/nmc/turnoverratio）和行业分类。
+
+### 配置
+
+```yaml
+market_data:
+  enabled: true
+  nodes:
+    - hs_a              # 沪深A股
+    - kcb               # 科创板（可选）
+    - cyb               # 创业板（可选）
+  concept_nodes:
+    - gn_hwqc           # 华为汽车（可选）
+  refresh_interval: 300  # 5 分钟刷新
+```
+
+### 数据表
+
+| 表 | 内容 |
+|----|------|
+| `dwd_node_data` | 标的基本面（per/pb/mktcap/nmc/turnoverratio） |
+| `dim_industries` | 行业分类（申万一级） |
+| `dim_concepts` | 概念板块 |
+| `dim_symbol_classifications` | 标的↔行业/概念映射 |
+| `ads_symbol_fundamentals` | ADS 视图：基本面 + 行业关联 |
+
+### 使用
+
+```python
+from src.market_data import MarketDataLoader
+
+loader = MarketDataLoader(conn, config)
+loader.load_all()  # 一次性加载节点数据 + 分类
+
+# 查询
+conn.execute("SELECT symbol, per, pb, mktcap FROM dwd_node_data WHERE per > 0 ORDER BY per")
+```
+
 ## 数据能力评估
 
 详见 [docs/data-capability-assessment.md](docs/data-capability-assessment.md)：
@@ -192,3 +235,13 @@ latest = compute_latest(conn, "sh000001")
 - 7 项关键缺口（历史日线、复权、成交笔数、资金流向、基本面、行业分类、两融）
 - 量化框架适配性（pandas / TA-Lib / backtrader）
 - 未来优化路线图
+
+## API 接口探查
+
+详见 [docs/api-exploration-report.md](docs/api-exploration-report.md)：
+- 3 个核心 API（实时行情、列表数据、节点树）
+- 全部可选节点（A 股/港股/美股/基金/期货/外汇，共 2000+ 节点）
+- 申万三级行业分类（499 个节点）
+- 概念板块（913 个概念）
+- 期货品种（60+）
+- 列表数据 API 比实时行情 API 多 5 个关键字段：per/pb/mktcap/nmc/turnoverratio

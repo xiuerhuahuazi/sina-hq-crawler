@@ -32,7 +32,7 @@ class TestInitDb:
         tables = [r[0] for r in conn2.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         ).fetchall()]
-        assert len(tables) == 4
+        assert len(tables) == 8  # 4 原始 + 4 DIM/节点数据表
         conn1.close()
         conn2.close()
 
