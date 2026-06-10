@@ -167,6 +167,42 @@ def init_db(db_path: str, config: dict) -> sqlite3.Connection:
           AND fetched_at >= DATETIME('now', '-1 hour', 'localtime')
     """)
 
+    # -- ADS: 实时盘中指标 -----------------------------------------------------
+    conn.execute("""
+        CREATE VIEW IF NOT EXISTS ads_intraday_vwap AS
+        SELECT
+            symbol,
+            bar_minute,
+            CASE WHEN SUM(volume) > 0
+                 THEN SUM(amount) / SUM(volume)
+                 ELSE NULL END AS vwap,
+            SUM(volume) AS cum_volume,
+            SUM(amount) AS cum_amount,
+            MAX(close)  AS last_close
+        FROM dws_minute_bars
+        WHERE bar_minute LIKE DATE('now', 'localtime') || '%'
+        GROUP BY symbol
+    """)
+
+    conn.execute("""
+        CREATE VIEW IF NOT EXISTS ads_daily_closes AS
+        SELECT
+            symbol,
+            trade_date,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            amount,
+            prev_close,
+            change_pct,
+            LAG(close, 1) OVER (PARTITION BY symbol ORDER BY trade_date) AS prev_close_calc,
+            ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY trade_date) AS day_seq
+        FROM dws_daily_summary
+        ORDER BY symbol, trade_date
+    """)
+
     conn.commit()
     log.info("Database initialized at %s (wal_mode=%s)", db_path, wal_mode)
     return conn

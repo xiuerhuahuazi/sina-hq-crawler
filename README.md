@@ -101,6 +101,7 @@ sessions:
 | `src/health.py` | HTTP 健康检查（127.0.0.1 本地监听） |
 | `src/reloader.py` | 配置热加载（mtime 检测 + SIGHUP 触发） |
 | `src/reporter.py` | 盘后自动报告（调用 analyze + 可选 maintain） |
+| `src/indicators.py` | 技术指标计算（盘中实时 + 离线历史，14 种指标） |
 
 ### 并发自动扩缩
 
@@ -145,3 +146,49 @@ Header: Referer: https://finance.sina.com.cn/
 ## 配置
 
 编辑 `config.yaml`，参考 `config.example.yaml` 中的注释说明。
+
+## 技术指标
+
+`src/indicators.py` 提供盘中实时和离线历史两类指标计算。
+
+### 盘中实时指标
+
+基于当前 session 的分钟K线和 tick 数据，交易时段内实时可用：
+
+| 指标 | 函数 | 说明 |
+|------|------|------|
+| VWAP | `intraday_vwap()` | 成交量加权平均价，机构基准价 |
+| 量比 | `intraday_volume_ratio()` | 最新分钟量 / 前 N 分钟均量 |
+| 买卖价差 | `intraday_orderbook_spread()` | ask[0] - bid[0]，流动性指标 |
+| 盘口挂单比 | `intraday_orderbook_imbalance()` | bid 总量 / ask 总量 |
+| 累计成交量 | `intraday_cumulative_volume()` | 当日成交总量 |
+
+### 离线历史指标
+
+基于 `dws_daily_summary` 多日数据，随运行天数积累：
+
+| 指标 | 函数 | 最少天数 |
+|------|------|---------|
+| MA/EMA | `daily_ma()` / `daily_ema()` | N 天 |
+| MACD(12,26,9) | `daily_macd()` | 26 天 |
+| RSI(14) | `daily_rsi()` | 15 天 |
+| BOLL(20) | `daily_boll()` | 20 天 |
+| ATR(14) | `daily_atr()` | 15 天 |
+| OBV | `daily_obv()` | 2 天 |
+| KDJ(9) | `daily_kdj()` | 9 天 |
+
+### 一键计算
+
+```python
+from src.indicators import compute_latest
+latest = compute_latest(conn, "sh000001")
+# {'vwap': 3200.5, 'rsi14': 65.3, 'macd_dif': 12.5, ...}
+```
+
+## 数据能力评估
+
+详见 [docs/data-capability-assessment.md](docs/data-capability-assessment.md)：
+- 当前数据字段清单
+- 7 项关键缺口（历史日线、复权、成交笔数、资金流向、基本面、行业分类、两融）
+- 量化框架适配性（pandas / TA-Lib / backtrader）
+- 未来优化路线图
