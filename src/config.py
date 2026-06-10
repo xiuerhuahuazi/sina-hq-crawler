@@ -88,7 +88,6 @@ _DEFAULTS: dict = {
         "enabled": False,
         "nodes": ["hs_a"],
         "concept_nodes": [],
-        "refresh_interval": 300,
     },
 }
 

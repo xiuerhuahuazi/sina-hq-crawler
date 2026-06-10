@@ -133,6 +133,7 @@ class CrawlDaemon:
         conn = init_db(db_path, self._config)
         monitor = QuoteMonitor(self._config) if self._config["monitor"]["enabled"] else None
         self._reporter = PostSessionReporter(self._config, conn)
+        self._market_data_loaded_date: date | None = None  # 每日只加载一次
 
         try:
             while not self._shutdown:
@@ -143,6 +144,8 @@ class CrawlDaemon:
                     self._retry_date = today
 
                 try:
+                    # 每日首次进入交易时段前加载市场数据
+                    self._maybe_load_market_data(conn)
                     self._run_session_loop(conn, monitor)
                 except Exception as e:
                     logger.critical("采集循环异常: %s", e)
@@ -193,9 +196,6 @@ class CrawlDaemon:
                         session.start_str, session.end_str, session.symbols)
 
             end_dt = self._calc_session_end_dt(session)
-
-            # 加载市场数据（基本面 + 行业分类）
-            self._load_market_data(conn, config)
 
             with QuoteFetcher(config) as fetcher:
                 storage = QuoteStorage(conn, config, monitor)
@@ -290,15 +290,19 @@ class CrawlDaemon:
         while time.time() < end and not self._shutdown:
             time.sleep(min(1.0, end - time.time()))
 
-    def _load_market_data(self, conn, config) -> None:
-        """加载市场数据（节点行情 + 行业分类）。仅在 enabled 时执行。"""
-        md_cfg = config.get("market_data", {})
+    def _maybe_load_market_data(self, conn) -> None:
+        """每日加载一次市场数据（基本面 + 行业分类）。"""
+        md_cfg = self._config.get("market_data", {})
         if not md_cfg.get("enabled", False):
             return
+        today = date.today()
+        if self._market_data_loaded_date == today:
+            return  # 今日已加载
         try:
-            with MarketDataLoader(conn, config) as loader:
+            with MarketDataLoader(conn, self._config) as loader:
                 result = loader.load_all()
-                logger.info("市场数据加载完成: 节点数据 %d 条, %d 行业, %d 概念",
+                self._market_data_loaded_date = today
+                logger.info("市场数据加载完成（每日一次）: 节点数据 %d 条, %d 行业, %d 概念",
                             result.get("node_data", 0),
                             result.get("industries", 0),
                             result.get("concepts", 0))
