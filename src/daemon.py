@@ -22,6 +22,7 @@ from src.session import SessionManager
 from src.reloader import ConfigReloader
 from src.health import HealthServer
 from src.reporter import PostSessionReporter
+from src.market_data import MarketDataLoader
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,9 @@ class CrawlDaemon:
 
             end_dt = self._calc_session_end_dt(session)
 
+            # 加载市场数据（基本面 + 行业分类）
+            self._load_market_data(conn, config)
+
             with QuoteFetcher(config) as fetcher:
                 storage = QuoteStorage(conn, config, monitor)
                 scheduler = CrawlScheduler(
@@ -285,6 +289,21 @@ class CrawlDaemon:
         end = time.time() + seconds
         while time.time() < end and not self._shutdown:
             time.sleep(min(1.0, end - time.time()))
+
+    def _load_market_data(self, conn, config) -> None:
+        """加载市场数据（节点行情 + 行业分类）。仅在 enabled 时执行。"""
+        md_cfg = config.get("market_data", {})
+        if not md_cfg.get("enabled", False):
+            return
+        try:
+            with MarketDataLoader(conn, config) as loader:
+                result = loader.load_all()
+                logger.info("市场数据加载完成: 节点数据 %d 条, %d 行业, %d 概念",
+                            result.get("node_data", 0),
+                            result.get("industries", 0),
+                            result.get("concepts", 0))
+        except Exception as e:
+            logger.warning("市场数据加载失败（不影响实时采集）: %s", e)
 
     def _shutdown_all(self) -> None:
         """清理所有子系统。"""

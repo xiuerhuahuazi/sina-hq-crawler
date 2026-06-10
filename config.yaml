@@ -82,12 +82,8 @@ daemon:
 
 # 市场数据（节点行情 + 行业/概念分类）
 market_data:
-  enabled: false                   # 是否启用节点数据采集
-  nodes:                           # 采集的节点列表
-    - hs_a                         # 沪深A股（全部）
-    # - sz_a                       # 深市A股
-    # - bjs_root                   # 北交所
-    # - kcb                        # 科创板
-    # - cyb                        # 创业板
-  concept_nodes: []                # 概念板块节点（如 gn_hwqc, gn_BCdc）
-  refresh_interval: 300            # 刷新间隔（秒）
+  enabled: true
+  nodes:
+    - hs_a                         # 沪深A股全部（含沪深北三所，无需再加 sz_a/bjs_root）
+  concept_nodes: []
+  refresh_interval: 300
