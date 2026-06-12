@@ -24,6 +24,8 @@ crawl = "src.crawler:main"
 analyze = "src.analyze:main"
 maintain = "src.maintenance:main"
 daemon = "src.daemon:main"
+agents = "src.agents.orchestrator:main"
+score = "src.agents.scorer:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

@@ -211,6 +211,9 @@ class CrawlDaemon:
                     session.symbols, session.start_str, session.end_str,
                 )
 
+            # 多智能体分析报告
+            self._run_analysis_pipeline(conn, session.symbols)
+
             # 更新健康状态
             self._update_health_status(session_mgr, None)
 
@@ -308,6 +311,24 @@ class CrawlDaemon:
                             result.get("concepts", 0))
         except Exception as e:
             logger.warning("市场数据加载失败（不影响实时采集）: %s", e)
+
+    def _run_analysis_pipeline(self, conn, symbols: list[str]) -> None:
+        """运行多智能体分析流水线，生成分析报告。"""
+        try:
+            from src.agents.orchestrator import AnalysisPipeline
+            pipeline = AnalysisPipeline(conn, self._config)
+            analysis_state = pipeline.run(
+                symbols=symbols,
+                analysis_date=date.today().isoformat(),
+            )
+            report_md = pipeline.format_report(analysis_state)
+            report_dir = Path(self._config["daemon"]["post_market_report"]["output_dir"])
+            report_dir.mkdir(parents=True, exist_ok=True)
+            analysis_file = report_dir / f"{date.today().isoformat()}_analysis.md"
+            analysis_file.write_text(report_md, encoding="utf-8")
+            logger.info("多智能体分析报告: %s", analysis_file)
+        except Exception as e:
+            logger.warning("多智能体分析失败（非致命）: %s", e)
 
     def _shutdown_all(self) -> None:
         """清理所有子系统。"""
