@@ -84,5 +84,5 @@ daemon:
 market_data:
   enabled: true
   nodes:
-    - hs_a                         # 沪深A股全部（含沪深北三所）
-  concept_nodes: []                # 概念板块节点（如 gn_hwqc, gn_BCdc）
+    - hs_a
+  concept_nodes: ["gn_hwqc", "gn_BCdc"]

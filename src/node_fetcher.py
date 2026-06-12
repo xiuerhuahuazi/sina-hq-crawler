@@ -50,11 +50,11 @@ class NodeDataFetcher:
         return []
 
     def fetch_all(self, node: str, sort: str = "symbol",
-                  asc: int = 1, num: int = 80) -> list[dict]:
-        """分页获取指定节点的全部数据。"""
+                  asc: int = 1, num: int = 80, max_pages: int = 100) -> list[dict]:
+        """分页获取指定节点的全部数据。max_pages 防止无限循环。"""
         all_data: list[dict] = []
         page = 1
-        while True:
+        while page <= max_pages:
             batch = self.fetch_node(node, sort=sort, asc=asc, page=page, num=num)
             if not batch:
                 break

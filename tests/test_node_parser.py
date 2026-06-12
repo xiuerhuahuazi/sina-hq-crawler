@@ -17,9 +17,10 @@ class TestSafeFloat:
     def test_dash(self):
         assert _safe_float("-") is None
 
-    def test_zero_returns_none(self):
-        assert _safe_float(0) is None
-        assert _safe_float("0") is None
+    def test_zero_returns_zero(self):
+        """零值保留（停牌volume=0、平盘pricechange=0 有意义）。"""
+        assert _safe_float(0) == 0.0
+        assert _safe_float("0") == 0.0
 
     def test_invalid_string(self):
         assert _safe_float("abc") is None

@@ -103,34 +103,53 @@ class MarketDataLoader:
         self._conn.commit()
 
     def _load_sw_industries(self) -> int:
-        """加载申万行业分类节点树并存入 dim_industries。"""
-        try:
-            tree = self._fetch_nodes_tree()
-        except Exception as e:
-            logger.error("获取节点树失败: %s", e)
-            return 0
+        """从节点树提取申万行业名称并存入 dim_industries。"""
+        # 从节点树获取行业名称映射
+        name_map = self._extract_sw_names_from_tree()
 
         count = 0
-        # 从树中提取申万行业节点
         for node_code in _SW_NODES:
             try:
-                items = self._fetcher.fetch_all(node_code, num=1)
+                # 只取1条验证节点存在（fetch_node 不分页）
+                items = self._fetcher.fetch_node(node_code, num=1)
                 if items:
-                    # 用节点代码的后两位或名称匹配行业
-                    name = node_code  # 默认
-                    # 从节点代码提取简短名称
-                    level = 1
+                    name = name_map.get(node_code, node_code)
                     self._conn.execute("""
                         INSERT OR REPLACE INTO dim_industries
                         (code, name, level, parent_code, updated_at)
                         VALUES (?, ?, ?, ?, ?)
-                    """, (node_code, name, level, None, datetime.now().isoformat()))
+                    """, (node_code, name, 1, None, datetime.now().isoformat()))
                     count += 1
             except Exception:
                 pass
 
         self._conn.commit()
         return count
+
+    def _extract_sw_names_from_tree(self) -> dict[str, str]:
+        """从节点树中提取申万行业代码→名称映射。"""
+        name_map: dict[str, str] = {}
+        try:
+            tree = self._fetch_nodes_tree()
+            self._walk_tree(tree, name_map)
+        except Exception as e:
+            logger.debug("提取行业名称失败: %s", e)
+        return name_map
+
+    @staticmethod
+    def _walk_tree(node, name_map: dict[str, str]) -> None:
+        """递归遍历节点树，提取 [name, url, code] 形式的叶子节点。"""
+        if isinstance(node, list):
+            if (len(node) >= 3
+                    and isinstance(node[0], str)
+                    and isinstance(node[2], str)
+                    and node[2]
+                    and not isinstance(node[1], list)):
+                # 叶子节点 [name, url, code]
+                name_map[node[2]] = node[0]
+            else:
+                for item in node:
+                    MarketDataLoader._walk_tree(item, name_map)
 
     def _load_concepts(self) -> int:
         """加载概念板块数据。"""
@@ -175,11 +194,10 @@ class MarketDataLoader:
         return count
 
     def _load_symbol_industry(self, symbol: str) -> None:
-        """通过 getHQNodes 树查找 symbol 的行业归属。"""
-        # 简化实现：通过遍历行业节点查找
+        """通过遍历行业节点查找 symbol 的行业归属。"""
         for node_code in _SW_NODES:
             try:
-                items = self._fetcher.fetch_node(node_code, num=80, page=1)
+                items = self._fetcher.fetch_all(node_code, num=80)
                 symbols_in_node = {item.get("symbol") for item in items}
                 if symbol in symbols_in_node:
                     self._conn.execute("""

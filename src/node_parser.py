@@ -6,12 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_float(val) -> float | None:
-    """安全转换为 float，失败返回 None。"""
+    """安全转换为 float，失败返回 None。零值保留（停牌volume=0、平盘pricechange=0 有意义）。"""
     if val is None or val == "" or val == "-":
         return None
     try:
-        v = float(val)
-        return v if v != 0.0 else None
+        return float(val)
     except (ValueError, TypeError):
         return None
 

@@ -113,4 +113,3 @@ market_data:
     # - kcb                        # 科创板
     # - cyb                        # 创业板
   concept_nodes: []                # 概念板块节点（如 gn_hwqc, gn_BCdc）
-  refresh_interval: 300            # 刷新间隔（秒）
