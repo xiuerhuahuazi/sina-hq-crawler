@@ -67,6 +67,9 @@ class HealthServer:
         """停止服务器。"""
         if self._server:
             self._server.shutdown()
+            # 等待服务器线程退出，避免WSL上线程泄漏
+            if self._thread and self._thread.is_alive():
+                self._thread.join(timeout=2.0)
             logger.info("健康检查 HTTP 已停止")
 
     def update_status(self, status: dict) -> None:

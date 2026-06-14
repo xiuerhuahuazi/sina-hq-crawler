@@ -1,0 +1,27 @@
+{
+  "system": {
+    "os": "Darwin",
+    "os_version": "Darwin Kernel Version 25.5.0: Mon Apr 27 20:41:26 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T8132",
+    "architecture": "arm64",
+    "python_version": "3.9.6 (default, Apr  7 2026, 02:38:40) \n[Clang 21.0.0 (clang-2100.0.123.102)]",
+    "python_executable": "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+    "is_macos": true,
+    "is_linux": false,
+    "is_wsl": false,
+    "is_arm64": true,
+    "is_x86_64": false
+  },
+  "uv": {
+    "installed": true,
+    "version": "Python 3.13.7",
+    "error": null
+  },
+  "recommendations": [
+    "✓ ARM64架构，性能优秀",
+    "✓ macOS环境，支持良好",
+    "✓ uv已安装"
+  ],
+  "warnings": [
+    "Python版本 3.9 低于项目要求的 3.13+"
+  ]
+}
