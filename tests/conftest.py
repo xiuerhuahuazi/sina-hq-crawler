@@ -1,6 +1,8 @@
 import pytest
 import sqlite3
 import sys
+import platform
+import os
 from pathlib import Path
 
 # Ensure src is importable
@@ -8,6 +10,56 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import _DEFAULTS, _deep_merge
 from src.db import init_db
+
+
+def get_environment_info():
+    """获取当前环境信息。"""
+    info = {
+        "os": platform.system(),
+        "architecture": platform.machine(),
+        "is_wsl": False,
+        "is_macos": platform.system() == "Darwin",
+        "is_linux": platform.system() == "Linux",
+        "is_arm64": platform.machine() == "arm64",
+    }
+
+    # 检测WSL
+    if info["is_linux"]:
+        try:
+            with open('/proc/version', 'r') as f:
+                version_info = f.read().lower()
+                info["is_wsl"] = "microsoft" in version_info
+        except:
+            pass
+
+    return info
+
+
+@pytest.fixture(autouse=True)
+def environment_setup(request):
+    """环境配置fixture。"""
+    env_info = get_environment_info()
+
+    # 根据环境设置超时（通过配置文件，不使用mark）
+    # pytest-timeout 插件会自动应用 pytest.ini 中的 timeout 设置
+
+    # 存储环境信息供测试使用
+    request.node._env_info = env_info
+
+
+@pytest.fixture(autouse=True)
+def cleanup_resources():
+    """自动清理测试资源，防止线程泄漏。"""
+    yield
+    # 测试结束后强制垃圾回收
+    import gc
+    gc.collect()
+
+
+@pytest.fixture
+def env_info(environment_setup):
+    """提供环境信息给测试。"""
+    return environment_setup._env_info
 
 
 @pytest.fixture
