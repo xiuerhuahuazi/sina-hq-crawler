@@ -1,6 +1,5 @@
 """市场数据加载器 — 抓取并存储节点数据 + 行业/概念分类。"""
 
-import json
 import logging
 import sqlite3
 from datetime import datetime

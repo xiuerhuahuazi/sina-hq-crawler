@@ -126,7 +126,7 @@ class CrawlScheduler:
                     self._fetch_and_store_batch(self._symbols, 1, len(batches))
                 else:
                     # Multi-threaded: threads fetch, main thread stores
-                    result_queue = Queue()
+                    _queue = Queue()
 
                     with ThreadPoolExecutor(max_workers=workers) as pool:
                         futures = []

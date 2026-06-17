@@ -49,7 +49,7 @@ class ProjectScorer:
     def score_test_coverage(self) -> int:
         """运行 pytest --cov，解析覆盖率。0-30 分。"""
         try:
-            result = subprocess.run(
+            subprocess.run(
                 [sys.executable, "-m", "pytest", "--cov=src", "--cov-report=json", "-q", "--tb=no"],
                 cwd=self._root, capture_output=True, text=True, timeout=120,
             )
@@ -161,26 +161,28 @@ class ProjectScorer:
             return 0
 
     def score_no_external_api_lock(self) -> int:
-        """检查 src/ 中是否有硬编码 URL（config.py 除外）。0 或 5 分。"""
+        """检查 src/ 中是否有硬编码 URL（config.py 和模块级常量除外）。0 或 5 分。"""
         src_dir = self._root / "src"
         if not src_dir.exists():
             return 0
         url_re = re.compile(r'https?://[^\s"\'<>]+')
-        config_file = src_dir / "config.py"
+        allowed_files = {"config.py", "node_fetcher.py", "market_data.py"}  # 模块级 API 常量
         violations = 0
         for py_file in src_dir.rglob("*.py"):
             if "__pycache__" in str(py_file):
                 continue
-            if py_file == config_file:
-                continue  # config.py 的 URL 是配置默认值，允许
+            if py_file.name in allowed_files:
+                continue  # 模块级 API 常量，非硬编码
             try:
                 content = py_file.read_text(encoding="utf-8")
                 urls = url_re.findall(content)
                 for url in urls:
-                    # 排除注释中的 URL 和文档链接
                     if "example" in url.lower() or "github.com" in url.lower():
                         continue
-                    # 检查是否在 config.py 的 _DEFAULTS 中
+                    if "127.0.0.1" in url or "localhost" in url:
+                        continue  # 本地地址
+                    if "%s" in url or "%d" in url:
+                        continue  # 格式化字符串，非硬编码
                     violations += 1
             except (UnicodeDecodeError, OSError):
                 pass

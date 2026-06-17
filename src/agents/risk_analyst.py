@@ -102,9 +102,9 @@ class RiskAnalyst(BaseAgent):
         rows = list(reversed(rows))
         tr_list = []
         for i in range(1, len(rows)):
-            h, l, pc = rows[i][0], rows[i][1], rows[i-1][2]
-            if h and l and pc:
-                tr = max(h - l, abs(h - pc), abs(l - pc))
+            hi, lo, pc = rows[i][0], rows[i][1], rows[i-1][2]
+            if hi and lo and pc:
+                tr = max(hi - lo, abs(hi - pc), abs(lo - pc))
                 tr_list.append(tr)
         if not tr_list:
             return None
