@@ -135,7 +135,7 @@ def format_analysis_report(state: dict) -> str:
 
     for sym, data in final.get("per_symbol", {}).items():
         lines.append(f"## {sym}\n")
-        lines.append(f"| 指标 | 值 |")
+        lines.append("| 指标 | 值 |")
         lines.append("|------|------|")
         lines.append(f"| 综合评分 | {data['final_score']:.4f} |")
         lines.append(f"| 建议 | **{data['recommendation']}** |")

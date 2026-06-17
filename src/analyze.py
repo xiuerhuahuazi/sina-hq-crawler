@@ -5,7 +5,7 @@ import argparse
 import sqlite3
 import sys
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from src.config import load_config
@@ -100,8 +100,8 @@ def analyze_symbol(conn, symbol: str, date: str = None) -> dict:
         'p50_latency': p50,
         'p95_latency': p95,
         'max_latency': max_lat or 0,
-        'latency_gt_500': sum(1 for l in lat_list if l > 500),
-        'latency_gt_1000': sum(1 for l in lat_list if l > 1000),
+        'latency_gt_500': sum(1 for lat in lat_list if lat > 500),
+        'latency_gt_1000': sum(1 for lat in lat_list if lat > 1000),
     }
 
 def generate_report(conn, config, date: str = None, symbols: list = None) -> str:

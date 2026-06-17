@@ -349,11 +349,11 @@ def daily_atr(conn: sqlite3.Connection, symbol: str,
     # 计算 True Range
     tr_list = []
     for i in range(1, len(data)):
-        h, l, pc = data[i]["high"], data[i]["low"], data[i - 1]["close"]
-        if h is None or l is None or pc is None:
+        hi, lo, prev_c = data[i]["high"], data[i]["low"], data[i - 1]["close"]
+        if hi is None or lo is None or prev_c is None:
             tr_list.append(None)
             continue
-        tr = max(h - l, abs(h - pc), abs(l - pc))
+        tr = max(hi - lo, abs(hi - prev_c), abs(lo - prev_c))
         tr_list.append(tr)
 
     result = [{"trade_date": data[0]["trade_date"], "atr": None}]
