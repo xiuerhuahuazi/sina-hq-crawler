@@ -48,13 +48,11 @@ def analyze_symbol(conn, symbol: str, date: str = None) -> dict:
         WHERE symbol = ? {date_filter} ORDER BY fetched_at DESC LIMIT 1
     """, params).fetchone()
 
-    # ODS records for this date (or all dates if no filter)
-    if date:
-        ods_count = conn.execute(
-            "SELECT COUNT(*) FROM ods_raw_quotes WHERE DATE(request_ts) = ?", (date,)
-        ).fetchone()[0]
-    else:
-        ods_count = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
+    # Per-symbol ODS count is not meaningful — each ODS record contains
+    # all symbols in one API call, so per-symbol dedup ratio has no
+    # useful interpretation.  Dedup rate is computed globally in
+    # generate_report() instead.
+    ods_count = None
 
     # Latency percentiles (approximate via ordered selection)
     latencies = conn.execute(f"""
@@ -80,8 +78,6 @@ def analyze_symbol(conn, symbol: str, date: str = None) -> dict:
         'symbol': symbol,
         'name': first_row[2] if first_row else symbol,
         'tick_count': count,
-        'ods_count': ods_count,
-        'dedup_ratio': (1 - count / ods_count) * 100 if ods_count > 0 else 0,
         'first_price': first_row[0] if first_row else None,
         'last_price': last_row[0] if last_row else None,
         'prev_close': first_row[1] if first_row else None,
@@ -186,8 +182,6 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
 | 指标 | 值 |
 |------|-----|
 | DWD tick 数 | {stats['tick_count']} |
-| ODS 原始记录 | {stats['ods_count']} |
-| 去重率 | {stats['dedup_ratio']:.1f}% |
 | 平均延迟 | {stats['avg_latency']:.1f} ms |
 | P50 延迟 | {stats['p50_latency']:.1f} ms |
 | P95 延迟 | {stats['p95_latency']:.1f} ms |
