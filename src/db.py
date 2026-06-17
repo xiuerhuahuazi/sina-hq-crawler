@@ -88,6 +88,10 @@ def init_db(db_path: str, config: dict) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_dwd_symbol_date
         ON dwd_quotes (symbol, quote_date)
     """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_dwd_quote_date
+        ON dwd_quotes (quote_date)
+    """)
 
     # -- DWS layer: aggregated minute bars ----------------------------------
     conn.execute("""

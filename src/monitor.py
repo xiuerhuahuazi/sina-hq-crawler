@@ -29,6 +29,10 @@ class QuoteMonitor:
         # Consecutive fetch-error counter.
         self._consecutive_failures: int = 0
 
+        # Symbols that have actually produced stored ticks.
+        # Used to filter check_gaps() to only monitored symbols.
+        self._stored_symbols: set[str] = set()
+
         # Stats
         self._total_ticks: int = 0
         self._total_alerts: int = 0
@@ -64,6 +68,7 @@ class QuoteMonitor:
             return
 
         self._total_ticks += 1
+        self._stored_symbols.add(symbol)
 
         # --- latency checks ---
         if latency_ms >= self._latency_critical_ms:
@@ -104,9 +109,14 @@ class QuoteMonitor:
         """
         if not self._enabled:
             return
+        # Only update fetch time for symbols that have been stored
+        # (i.e., have appeared in on_tick at least once).
+        # This prevents false "No ticks" alerts for symbols that are
+        # fetched by the API but filtered out by storage.
         now = time.monotonic()
         for sym in symbols:
-            self._last_fetch_time[sym] = now
+            if sym in self._stored_symbols:
+                self._last_fetch_time[sym] = now
         self._consecutive_failures = 0
 
     def on_fetch_error(self, error: Exception) -> None:
@@ -119,7 +129,12 @@ class QuoteMonitor:
             )
 
     def check_gaps(self, symbols: list[str]) -> None:
-        """Alert if any symbol has gone silent beyond the gap threshold.
+        """Alert if any stored symbol has gone silent beyond the gap threshold.
+
+        Only checks symbols that have actually produced stored ticks
+        (tracked in ``_stored_symbols``).  Symbols that are fetched by
+        the API but filtered out by storage are ignored, preventing
+        false "No ticks" alerts.
 
         Uses ``_last_fetch_time`` (updated on every successful API
         response) rather than ``_last_tick_time`` (only updated when
@@ -130,7 +145,7 @@ class QuoteMonitor:
             return
 
         now = time.monotonic()
-        for sym in symbols:
+        for sym in self._stored_symbols:
             last = self._last_fetch_time.get(sym)
             if last is not None and (now - last) > self._gap_threshold_seconds:
                 self._alert(
@@ -147,6 +162,7 @@ class QuoteMonitor:
             "total_alerts": self._total_alerts,
             "alert_counts": dict(self._alert_counts),
             "consecutive_failures": self._consecutive_failures,
+            "stored_symbols": sorted(self._stored_symbols),
         }
 
     # ------------------------------------------------------------------

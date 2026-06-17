@@ -43,14 +43,14 @@ monitor:
   enabled: true
   latency_warn_ms: 500
   latency_critical_ms: 2000
-  gap_threshold_seconds: 15
+  gap_threshold_seconds: 60
   price_spike_pct: 3.0
   alert_to: console
   alert_file: "logs/alerts.log"
 
 retention:
   ods_days: 7
-  dwd_days: 90
+  dwd_days: 14
   dws_days: 365
   compress_on_cleanup: true
   archive_dir: "archives/"

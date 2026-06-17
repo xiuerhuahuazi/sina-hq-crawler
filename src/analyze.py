@@ -48,13 +48,13 @@ def analyze_symbol(conn, symbol: str, date: str = None) -> dict:
         WHERE symbol = ? {date_filter} ORDER BY fetched_at DESC LIMIT 1
     """, params).fetchone()
 
-    # Dedup stats: count how many ODS rounds contain this symbol
-    # Each ODS record may contain multiple symbols, so we count records
-    # where this symbol appears, but normalize by the average symbols per request
-    ods_total = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
-    # Approximate: assume each ODS request covers the same number of symbols
-    # For per-symbol ratio, use DWD tick count vs expected (ods_total) directly
-    ods_count = ods_total  # each round fetches all symbols together
+    # ODS records for this date (or all dates if no filter)
+    if date:
+        ods_count = conn.execute(
+            "SELECT COUNT(*) FROM ods_raw_quotes WHERE DATE(request_ts) = ?", (date,)
+        ).fetchone()[0]
+    else:
+        ods_count = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
 
     # Latency percentiles (approximate via ordered selection)
     latencies = conn.execute(f"""
@@ -113,13 +113,23 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
     db_path = Path(config['database']['path'])
     db_size = db_path.stat().st_size / 1024 if db_path.exists() else 0
 
-    # DWD total count
-    dwd_count = conn.execute("SELECT COUNT(*) FROM dwd_quotes").fetchone()[0]
-    ods_count = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
+    # DWD and ODS counts for the report date (or all dates if no filter)
+    if date:
+        dwd_count = conn.execute(
+            "SELECT COUNT(*) FROM dwd_quotes WHERE quote_date = ?", (date,)
+        ).fetchone()[0]
+        ods_count = conn.execute(
+            "SELECT COUNT(*) FROM ods_raw_quotes WHERE DATE(request_ts) = ?", (date,)
+        ).fetchone()[0]
+    else:
+        dwd_count = conn.execute("SELECT COUNT(*) FROM dwd_quotes").fetchone()[0]
+        ods_count = conn.execute("SELECT COUNT(*) FROM ods_raw_quotes").fetchone()[0]
 
-    # Overall dedup: compare DWD count against expected (ODS rounds × symbols)
-    expected_ticks = ods_count * len(symbols)
-    overall_dedup = (1 - dwd_count / expected_ticks) * 100 if expected_ticks > 0 else 0
+    # Dedup rate: % of ODS fetch rounds that were deduplicated (no new DWD tick)
+    # Each ODS record = one API call round; each DWD record = one unique tick
+    # When DWD ≈ ODS → 0% dedup (price changes every poll)
+    # When DWD < ODS → positive dedup (some polls had unchanged price)
+    overall_dedup = (1 - dwd_count / ods_count) * 100 if ods_count > 0 else 0
 
     report = f"""# 新浪行情采集系统 — 数据分析报告
 
@@ -133,7 +143,6 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
 |------|-----|
 | ODS 采集轮次 | {ods_count} |
 | DWD 清洗记录 | {dwd_count} |
-| 预期总 tick 数 | {expected_ticks} |
 | 整体去重率 | {overall_dedup:.1f}% |
 | 分析标的数 | {len(symbols)} |
 
@@ -195,14 +204,14 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
     health_items = []
 
     # Check dedup effectiveness
-    if dwd_count > 0 and expected_ticks > 0:
+    if dwd_count > 0 and ods_count > 0:
         dedup_rate = overall_dedup
         if dedup_rate > 30:
             health_items.append(f"- **去重有效**: DWD 去重率 {dedup_rate:.1f}%，存储优化显著")
-        elif dedup_rate > 0:
+        elif dedup_rate >= 0:
             health_items.append(f"- **去重正常**: DWD 去重率 {dedup_rate:.1f}%")
         else:
-            health_items.append(f"- **数据活跃**: 去重率 {dedup_rate:.1f}%，标的交易频繁")
+            health_items.append(f"- **⚠️ 去重异常**: 去重率 {dedup_rate:.1f}%（DWD 记录多于 ODS 轮次，数据可能累积或重复写入）")
 
     # Check latency
     all_stats = [analyze_symbol(conn, s, date) for s in symbols]
@@ -223,10 +232,10 @@ def generate_report(conn, config, date: str = None, symbols: list = None) -> str
     # Check data completeness
     if valid_stats:
         total_ticks = sum(s['tick_count'] for s in valid_stats)
-        total_ods = sum(s['ods_count'] for s in valid_stats)
-        if total_ods > 0:
-            completeness = total_ticks / total_ods * 100
-            health_items.append(f"- **数据完整度**: {completeness:.1f}%")
+        # Completeness = actual DWD ticks / ODS rounds (each round should produce ~1 tick per symbol)
+        if ods_count > 0:
+            completeness = total_ticks / ods_count * 100
+            health_items.append(f"- **数据完整度**: {completeness:.1f}%（DWD ticks {total_ticks} / ODS 轮次 {ods_count}）")
 
     if not health_items:
         health_items.append("- 无数据可供评估")

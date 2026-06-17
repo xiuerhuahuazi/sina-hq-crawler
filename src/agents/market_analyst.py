@@ -53,7 +53,11 @@ class MarketAnalyst(BaseAgent):
     def _analyze_symbol(self, conn, symbol: str) -> dict:
         """分析单个标的的技术指标。"""
         data = compute_latest(conn, symbol)
-        if data.get("rsi14") is None and data.get("macd_dif") is None:
+
+        # 需要至少一个有效指标才能分析
+        available = [k for k in ("rsi14", "macd_dif", "ma5", "vwap", "kdj_j", "boll_mid")
+                     if data.get(k) is not None]
+        if not available:
             return self._empty_result("insufficient_data")
 
         scores = {}
@@ -145,12 +149,14 @@ class MarketAnalyst(BaseAgent):
 
     @staticmethod
     def _score_ma(close, ma5, ma10, ma20) -> float:
-        if any(v is None for v in [close, ma5, ma10, ma20]):
+        if close is None or ma5 is None:
             return 0.0
-        if close > ma5 > ma10 > ma20:
-            return 1.0
-        if close < ma5 < ma10 < ma20:
-            return -1.0
+        if ma10 is not None and ma20 is not None:
+            if close > ma5 > ma10 > ma20:
+                return 1.0
+            if close < ma5 < ma10 < ma20:
+                return -1.0
+        # 只有 MA5 时也能判断短期趋势
         if close > ma5:
             return 0.3
         if close < ma5:

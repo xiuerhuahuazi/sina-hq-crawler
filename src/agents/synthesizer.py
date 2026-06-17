@@ -135,6 +135,21 @@ def format_analysis_report(state: dict) -> str:
 
     for sym, data in final.get("per_symbol", {}).items():
         lines.append(f"## {sym}\n")
+
+        # 数据可用性
+        avail = []
+        mkt = (state.get("market_assessment") or {}).get("per_symbol", {}).get(sym, {})
+        if mkt.get("note") == "insufficient_data":
+            avail.append("技术指标: 数据不足")
+        else:
+            avail.append("技术指标: ✓")
+        fund = (state.get("fundamentals_assessment") or {}).get("per_symbol", {}).get(sym, {})
+        if fund.get("signal") == "no_data":
+            avail.append("基本面: 无节点数据")
+        else:
+            avail.append("基本面: ✓")
+        lines.append(f"**数据状态**: {' | '.join(avail)}\n")
+
         lines.append("| 指标 | 值 |")
         lines.append("|------|------|")
         lines.append(f"| 综合评分 | {data['final_score']:.4f} |")
